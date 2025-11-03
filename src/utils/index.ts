@@ -1,6 +1,23 @@
 import initSqlJs from 'sql.js'
 import sqlWasm from 'sql.js/dist/sql-wasm.wasm?url'
 
+export function getExampleSqlOptions() {
+  return [
+    {
+      label: 'Show version',
+      value: 'SELECT sqlite_version()',
+    },
+    {
+      label: 'Show tables',
+      value: `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`,
+    },
+    {
+      label: 'Show test table',
+      value: `SELECT * FROM test;`,
+    },
+  ]
+}
+
 async function readFileAsBuffer(file: File): Promise<Uint8Array> {
   if (!file) {
     throw new Error('File not provided')

@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import type { Database, QueryExecResult } from 'sql.js'
+import { ElButton, ElOption, ElSelect } from 'element-plus'
 import { onMounted, ref } from 'vue'
-import { getSqlInstance } from '@/utils'
+import { getExampleSqlOptions, getSqlInstance } from '@/utils'
+import ResultTable from './ResultTable.vue'
 
 let db: Database | null = null
-const sql = ref('SELECT * FROM test;')
+const exampleSqlOptions = getExampleSqlOptions()
+const sql = ref('')
+const error = ref('')
 const result = ref<QueryExecResult[]>([{ columns: [], values: [] }])
-const error = ref<string>('')
+
+function onChangeSql(value: string) {
+  sql.value = value
+}
 
 async function executeSql() {
   if (!db) {
     error.value = 'Database not initialized'
+    return
+  }
+  if (!sql.value) {
+    error.value = 'SQL is empty'
     return
   }
   try {
@@ -22,46 +33,55 @@ async function executeSql() {
   }
 }
 
+function loadFile() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (file) {
+      db = await getSqlInstance(file)
+    }
+  })
+  input.click()
+}
+
 onMounted(async () => {
   db = await getSqlInstance()
   db.run('CREATE TABLE IF NOT EXISTS test (id INT PRIMARY KEY, name TEXT)')
-  db.run('INSERT INTO test (id, name) VALUES (1, \'test\')')
-  db.run('INSERT INTO test (id, name) VALUES (2, \'test2\')')
+  db.run(`INSERT INTO test (id, name) VALUES (1, 'test')`)
+  db.run(`INSERT INTO test (id, name) VALUES (2, 'test2')`)
 })
 </script>
 
 <template>
   <div class="sql-playground">
     <div class="sql-playground-head">
-      <button @click="executeSql">
+      <ElButton type="success" @click="loadFile">
+        <span>Load File</span>
+      </ElButton>
+      <ElSelect class="sql-playground-select" name="database" @change="onChangeSql">
+        <ElOption v-for="option in exampleSqlOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </ElOption>
+      </ElSelect>
+      <ElButton type="primary" @click="executeSql">
         ▶ Execute
-      </button>
+      </ElButton>
     </div>
     <div class="sql-playground-body">
       <div class="sql-input-container">
-        <textarea v-model="sql" class="sql-input" />
+        <textarea
+          v-model="sql"
+          class="sql-input"
+          placeholder="Enter some SQL. No inspiration ? Try “select sqlite_version()”"
+        />
       </div>
       <div class="sql-result-container">
         <div v-if="error" class="sql-result-error">
-          {{ error }}
+          Error: {{ error }}
         </div>
         <div v-else class="sql-result-success">
-          <table v-for="(res, index) in result" :key="index" class="sql-result-table">
-            <thead>
-              <tr>
-                <th v-for="col in res.columns" :key="col">
-                  {{ col }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in res.values" :key="i">
-                <td v-for="(v, j) in row" :key="j">
-                  {{ v }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <ResultTable :result="result" />
         </div>
       </div>
     </div>
@@ -76,24 +96,26 @@ onMounted(async () => {
 .sql-playground-head {
   padding: 10px;
   border: 1px solid #242424;
-  border-radius: 8px;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  .sql-playground-select {
+    width: 200px;
+  }
 }
 
 .sql-playground-body {
   width: 100%;
-  height: 600px;
-  display: flex;
-  gap: 20px;
 
   .sql-input-container {
-    flex: 1;
     border: 1px solid #242424;
-    border-radius: 8px;
     overflow: hidden;
+    margin-bottom: 10px;
     .sql-input {
       width: 100%;
-      height: 100%;
+      height: calc(100vh - 750px);
+      padding: 10px;
       outline: none;
       resize: none;
       border: none;
@@ -101,10 +123,19 @@ onMounted(async () => {
   }
 
   .sql-result-container {
-    flex: 1;
+    box-sizing: border-box;
+    height: 600px;
+    width: 100%;
     border: 1px solid #242424;
-    border-radius: 8px;
+    font-family: monospace;
+    .sql-result-error {
+      box-sizing: border-box;
+      height: 600px;
+      padding: 10px;
+      display: flex;
+      font-size: 14px;
+      font-weight: 400;
+    }
   }
-
 }
 </style>
